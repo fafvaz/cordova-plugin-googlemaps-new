@@ -147,6 +147,9 @@
       <preference name="android-targetSdkVersion" value="34" />
       <preference name="android-compileSdkVersion" value="34" />
       <preference name="android-minSdkVersion" value="23"/>
+      <preference name="GradlePluginAndroidVersion" value="8.2.0" />
+      <preference name="GradlePluginKotlinVersion" value="1.9.20" />
+      <preference name="GradleVersion" value="8.2" />
     </config-file>
 
     <config-file target="res/xml/config.xml" parent="/*">
