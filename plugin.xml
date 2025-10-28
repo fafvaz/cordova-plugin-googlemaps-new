@@ -143,6 +143,9 @@
       <preference name="xwalkZOrderOnTop" value="true"/>
 
       <!-- for this plugin -->
+      <preference name="AndroidXEnabled" value="true" />
+      <preference name="android-targetSdkVersion" value="34" />
+      <preference name="android-compileSdkVersion" value="34" />
       <preference name="android-minSdkVersion" value="21"/>
     </config-file>
 
@@ -290,10 +293,7 @@
   <!-- ios -->
   <platform name="ios">
 
-    <preference name="AndroidXEnabled" value="true" />
-    <preference name="android-targetSdkVersion" value="34" />
-    <preference name="android-compileSdkVersion" value="34" />
-    
+
     <preference name="LOCATION_WHEN_IN_USE_DESCRIPTION" default="This app wants to get your location while this app runs only."/>
     <preference name="LOCATION_ALWAYS_USAGE_DESCRIPTION" default="This app wants to get your location always, even this app runs in background."/>
 
