@@ -235,8 +235,8 @@
       <meta-data android:name="com.google.android.geo.API_KEY" android:value="${GOOGLE_MAPS_ANDROID_API_KEY}"/>
       <!-- Google Play Services SDK -->
       <meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version"/>
-      <!-- older - for Android 9 or above -->
-      <uses-library android:name="org.apache.http.legacy" android:required="false"/>
+      <!-- older - for Android 9 or above
+      <uses-library android:name="org.apache.http.legacy" android:required="false"/> -->
     </config-file>
 
     <config-file target="AndroidManifest.xml" parent="/manifest">
@@ -480,7 +480,7 @@
       Specs satisfying the `GoogleMaps (~> 10.0.0)` dependency were found, but they required a higher minimum deployment target.
     -->
     <config-file target="config.xml" parent="/*">
-        <preference name="deployment-target" value="16.0" />
+        <preference name="deployment-target" value="15.0" />
     </config-file>
 
     <podspec>
@@ -488,7 +488,7 @@
         <source url="https://github.com/CocoaPods/Specs.git"/>
       </config>
       <pods>
-        <pod name="GoogleMaps" spec="~> 10.4.0"/>
+        <pod name="GoogleMaps" spec="~> 9.0.0"/>
       </pods>
     </podspec>
 
