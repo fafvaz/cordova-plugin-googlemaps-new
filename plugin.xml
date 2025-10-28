@@ -146,7 +146,7 @@
       <preference name="AndroidXEnabled" value="true" />
       <preference name="android-targetSdkVersion" value="34" />
       <preference name="android-compileSdkVersion" value="34" />
-      <preference name="android-minSdkVersion" value="21"/>
+      <preference name="android-minSdkVersion" value="23"/>
     </config-file>
 
     <config-file target="res/xml/config.xml" parent="/*">
