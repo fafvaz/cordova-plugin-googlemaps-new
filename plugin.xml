@@ -235,7 +235,7 @@
       <meta-data android:name="com.google.android.geo.API_KEY" android:value="${GOOGLE_MAPS_ANDROID_API_KEY}"/>
       <!-- Google Play Services SDK -->
       <meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version"/>
-      <!-- for Android 9 or above -->
+      <!-- older - for Android 9 or above -->
       <uses-library android:name="org.apache.http.legacy" android:required="false"/>
     </config-file>
 
