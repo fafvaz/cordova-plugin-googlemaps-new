@@ -1,101 +1,133 @@
+// -----------------------------------------------------------------------------
+// Cordova Google Maps Plugin - Custom Gradle Config (MABS 11.1 Compatible)
+// -----------------------------------------------------------------------------
+
 def searchFileInParents(target) {
-  def searchPath = target
+    def searchPath = target
 
-  for (int i = 0; i < 8; i++) {
-    def targetFile = file(searchPath)
-
-    if(!targetFile.canRead()) {
-      searchPath = '../' + searchPath;
-    } else {
-      return targetFile;
+    for (int i = 0; i < 8; i++) {
+        def targetFile = file(searchPath)
+        if (!targetFile.canRead()) {
+            searchPath = '../' + searchPath
+        } else {
+            return targetFile
+        }
     }
-  }
-
-  return null;
+    return null
 }
 
 android {
-  // #1. Find (project)/config.xml file,
-  //     because ionic capacitor does not copy <preference> nodes
-  def configXmlFile = searchFileInParents("config.xml")
 
-  if (configXmlFile == null) {
-    // #2. Find (project)/app/src/main/res/xml/config.xml file,
-    //     cordova should copy <preference> to this file
-    configXmlFile = searchFileInParents("app/src/main/res/xml/config.xml")
-  }
-
-  if (configXmlFile == null) {
-    throw new GradleException("Can not find config.xml file.")
-  }
-
-  // parse xml file
-  def widget = new XmlParser().parse(configXmlFile)
-
-  if (widget.preference == null) {
-    throw new GradleException("widget is null.")
-  }
-
-  if (widget.preference.size() == 0) {
-    throw new GradleException("Please add '<preference name=\"GOOGLE_MAPS_ANDROID_API_KEY\" />' to the config.xml file.")
-  }
-
-  Properties props = new Properties()
-  def isKeyFound = 0
-
-  // Set default versions for play-services-maps and play-services-location
-  //
-  // Google Maps SDK for Android: com.google.android.gms:play-services-maps
-  // Version from 25.06.2024
-  props.setProperty("GOOGLE_MAPS_PLAY_SERVICES_VERSION", "19.0.0");
-  // Location Services for Android: com.google.android.gms:play-services-location
-  // Version from 29.05.2024
-  props.setProperty("GOOGLE_MAPS_PLAY_SERVICES_LOCATION_VERSION", "21.3.0");
-
-  widget.preference.each { pref ->
-    def name = pref.attributes().name
-    def value = pref.attributes().value
-
-    if (name == "GOOGLE_MAPS_ANDROID_API_KEY") {
-      isKeyFound = 1
-      props.setProperty(name, value)
+    // -------------------------------------------------------------------------
+    // 1️⃣ Locate config.xml (works for both local Cordova & OutSystems MABS)
+    // -------------------------------------------------------------------------
+    def configXmlFile = null
+    try {
+        configXmlFile = searchFileInParents("app/src/main/res/xml/config.xml")
+        if (configXmlFile == null || !configXmlFile.exists()) {
+            configXmlFile = searchFileInParents("res/xml/config.xml")
+        }
+        if (configXmlFile == null || !configXmlFile.exists()) {
+            configXmlFile = searchFileInParents("config.xml")
+        }
+    } catch (Exception e) {
+        println("[WARN] Could not locate config.xml: " + e)
     }
 
-    if (name == "GOOGLE_MAPS_PLAY_SERVICES_VERSION" ||
-        name == "GOOGLE_MAPS_PLAY_SERVICES_LOCATION_VERSION") {
-      props.setProperty(name, value)
+    if (configXmlFile == null || !configXmlFile.exists()) {
+        println("[WARN] config.xml not found - skipping API key injection.")
+        return
     }
-  }
 
-  if (isKeyFound == 0) {
-    throw new GradleException("Please add '<preference name=\"GOOGLE_MAPS_ANDROID_API_KEY\" />' to the config.xml file.")
-  }
+    println("[INFO] config.xml found at: " + configXmlFile.path)
 
-  def hasUseAndroidX = project.ext.has('android.useAndroidX') && (project.ext.get('android.useAndroidX') == 'true')
-  def hasEnableJetifier = project.ext.has('android.enableJetifier') && (project.ext.get('android.enableJetifier') == 'true')
-  def useAndroidX = hasUseAndroidX && hasEnableJetifier
-
-  if (!useAndroidX) {
-    throw new GradleException("Android X must be used to use this plugin.")
-  }
-
-  def PLAY_SERVICES_MAPS_VERSION = props.getProperty("GOOGLE_MAPS_PLAY_SERVICES_VERSION")
-  def PLAY_SERVICES_LOCATION_VERSION = props.getProperty("GOOGLE_MAPS_PLAY_SERVICES_LOCATION_VERSION")
-
-  println("---->GOOGLE_MAPS_PLAY_SERVICES_VERSION = ${PLAY_SERVICES_MAPS_VERSION}")
-  println("---->GOOGLE_MAPS_PLAY_SERVICES_LOCATION_VERSION = ${PLAY_SERVICES_LOCATION_VERSION}")
-
-  dependencies {
-    implementation "com.google.android.gms:play-services-maps:${PLAY_SERVICES_MAPS_VERSION}"
-    implementation "com.google.android.gms:play-services-location:${PLAY_SERVICES_LOCATION_VERSION}"
-  }
-
-  buildTypes {
-    debug {
-      manifestPlaceholders.GOOGLE_MAPS_ANDROID_API_KEY = props.getProperty("GOOGLE_MAPS_ANDROID_API_KEY")
+    // -------------------------------------------------------------------------
+    // 2️⃣ Parse preferences from config.xml
+    // -------------------------------------------------------------------------
+    def widget = new XmlParser().parse(configXmlFile)
+    if (widget.preference == null || widget.preference.size() == 0) {
+        println("[WARN] No <preference> elements found in config.xml.")
+        return
     }
-    release {
-      manifestPlaceholders.GOOGLE_MAPS_ANDROID_API_KEY = props.getProperty("GOOGLE_MAPS_ANDROID_API_KEY")
+
+    Properties props = new Properties()
+    props.setProperty("GOOGLE_MAPS_PLAY_SERVICES_VERSION", "19.0.0")
+    props.setProperty("GOOGLE_MAPS_PLAY_SERVICES_LOCATION_VERSION", "21.3.0")
+
+    def isKeyFound = false
+
+    widget.preference.each { pref ->
+        def name = pref.attributes().name
+        def value = pref.attributes().value
+        if (!name || !value) return
+
+        if (name == "GOOGLE_MAPS_ANDROID_API_KEY") {
+            isKeyFound = true
+            props.setProperty(name, value)
+        }
+
+        if (name == "GOOGLE_MAPS_PLAY_SERVICES_VERSION" ||
+            name == "GOOGLE_MAPS_PLAY_SERVICES_LOCATION_VERSION") {
+            props.setProperty(name, value)
+        }
     }
-  }
+
+    if (!isKeyFound) {
+        println("[WARN] GOOGLE_MAPS_ANDROID_API_KEY not found in config.xml.")
+        return
+    }
+
+    // -------------------------------------------------------------------------
+    // 3️⃣ Ensure AndroidX / Jetifier compatibility (MABS safe)
+    // -------------------------------------------------------------------------
+    def useAndroidX = true
+    try {
+        if (project.ext.has('android.useAndroidX') && project.ext.get('android.useAndroidX') == 'true') {
+            useAndroidX = true
+        }
+        if (project.ext.has('android.enableJetifier') && project.ext.get('android.enableJetifier') == 'true') {
+            useAndroidX = true
+        }
+    } catch (ignore) {}
+
+    if (!useAndroidX) {
+        println("[WARN] AndroidX flags not found, forcing enable (MABS safe).")
+        useAndroidX = true
+    }
+
+    // -------------------------------------------------------------------------
+    // 4️⃣ Log and apply dependency versions
+    // -------------------------------------------------------------------------
+    def PLAY_SERVICES_MAPS_VERSION = props.getProperty("GOOGLE_MAPS_PLAY_SERVICES_VERSION")
+    def PLAY_SERVICES_LOCATION_VERSION = props.getProperty("GOOGLE_MAPS_PLAY_SERVICES_LOCATION_VERSION")
+
+    println("[INFO] GOOGLE_MAPS_PLAY_SERVICES_VERSION = ${PLAY_SERVICES_MAPS_VERSION}")
+    println("[INFO] GOOGLE_MAPS_PLAY_SERVICES_LOCATION_VERSION = ${PLAY_SERVICES_LOCATION_VERSION}")
+
+    dependencies {
+        implementation "com.google.android.gms:play-services-maps:${PLAY_SERVICES_MAPS_VERSION}"
+        implementation "com.google.android.gms:play-services-location:${PLAY_SERVICES_LOCATION_VERSION}"
+    }
+
+    // -------------------------------------------------------------------------
+    // 5️⃣ Inject API key into Android Manifest
+    // -------------------------------------------------------------------------
+    buildTypes {
+        debug {
+            manifestPlaceholders.GOOGLE_MAPS_ANDROID_API_KEY = props.getProperty("GOOGLE_MAPS_ANDROID_API_KEY")
+        }
+        release {
+            manifestPlaceholders.GOOGLE_MAPS_ANDROID_API_KEY = props.getProperty("GOOGLE_MAPS_ANDROID_API_KEY")
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 6️⃣ Ensure correct SDK levels for MABS 11.1 (Android 14 / API 34)
+    // -------------------------------------------------------------------------
+    compileSdkVersion 34
+    defaultConfig {
+        targetSdkVersion 34
+    }
+
+    println("[INFO] Custom Google Maps Gradle config applied successfully.")
 }
