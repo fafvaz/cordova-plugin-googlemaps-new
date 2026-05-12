@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin id="cordova-plugin-googlemaps" version="2.0.0-capacitor" xmlns="http://apache.org/cordova/ns/plugins/1.0">
+    <name>Google Maps Hybrid</name>
+    <description>Full Feature Parity Google Maps for Cordova and Capacitor</description>
+    <license>Apache 2.0</license>
+    <keywords>google,map,geolocation,capacitor,ionic,outsystems,mabs</keywords>
+
+    <js-module src="www/capacitor-bridge.js" name="CapacitorGoogleMapsBridge" />
+    
+    <!-- Android -->
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="CapacitorGoogleMaps">
+                <param name="android-package" value="com.plugin.googlemaps.CapacitorGoogleMapsBridge"/>
+                <param name="onload" value="true" />
+            </feature>
+        </config-file>
+        <source-file src="src/android/CapacitorGoogleMapsBridge.java" target-dir="src/com/plugin/googlemaps" />
+        
+        <framework src="com.google.android.gms:play-services-maps:18.1.0" />
+        <framework src="com.google.maps.android:android-maps-utils:2.3.0" />
+    </platform>
+
+    <!-- iOS -->
+    <platform name="ios">
+        <config-file target="config.xml" parent="/*">
+            <feature name="CapacitorGoogleMaps">
+                <param name="ios-package" value="CapacitorGoogleMapsBridge"/>
+                <param name="onload" value="true" />
+            </feature>
+        </config-file>
+        <source-file src="src/ios/CapacitorGoogleMapsPlugin.swift" />
+        
+        <podspec>
+            <pods use-frameworks="true">
+                <pod name="GoogleMaps" spec="~> 7.3.0"/>
+                <pod name="Google-Maps-iOS-Utils" spec="~> 4.2.0"/>
+            </pods>
+        </podspec>
+    </platform>
+</plugin>
