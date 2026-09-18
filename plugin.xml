@@ -489,7 +489,7 @@
       Specs satisfying the `GoogleMaps (~> 9.0.0)` dependency were found, but they required a higher minimum deployment target.
     -->
     <config-file target="config.xml" parent="/*">
-        <preference name="deployment-target" value="16.0" />
+        <preference name="deployment-target" value="15.0" />
     </config-file>
 
     <podspec>
@@ -497,7 +497,7 @@
         <source url="https://cdn.cocoapods.org/"/>
       </config>
       <pods>
-        <pod name="GoogleMaps" spec="~> 10.0.0"/>
+        <pod name="GoogleMaps" spec="~> 9.0.0"/>
       </pods>
     </podspec>
 
