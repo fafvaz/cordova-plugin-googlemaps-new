@@ -482,22 +482,22 @@
 
 
     <!--
-      Google Maps SDK for iOS 10.0.0 needs minimum a deployment target of iOS 16
+      Google Maps SDK for iOS 10.4.0 needs minimum a deployment target of iOS 16
       This will only take effect, if the user does not specify the deployment target
       in the config.xml.
       If the deployment target is lower, there will be an error when adding this plugin:
       Specs satisfying the `GoogleMaps (~> 10.0.0)` dependency were found, but they required a higher minimum deployment target.
     -->
     <config-file target="config.xml" parent="/*">
-        <preference name="deployment-target" value="15.0" />
+        <preference name="deployment-target" value="16.0" />
     </config-file>
 
     <podspec>
       <config>
-        <source url="https://github.com/CocoaPods/Specs.git"/>
+        <source url="https://cdn.cocoapods.org/"/>
       </config>
       <pods>
-        <pod name="GoogleMaps" spec="~> 9.0.0"/>
+        <pod name="GoogleMaps" spec="~> 10.4.0"/>
       </pods>
     </podspec>
 
