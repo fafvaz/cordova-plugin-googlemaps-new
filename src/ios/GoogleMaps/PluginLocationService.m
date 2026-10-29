@@ -244,26 +244,24 @@
         urlStr = [urlStr stringByAppendingFormat:@"&components=country:%@", opts[@"country"]];
     }
     
-    [self.executeQueue addOperationWithBlock:^{
-        [PluginUtil getJsonWithURL:[NSURL URLWithString:urlStr] completionBlock:^(BOOL succeeded, NSDictionary *response, NSString *error) {
-            CDVPluginResult* pluginResult;
-            if (!succeeded) {
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error ?: @"UNKNOWN_ERROR"];
-            } else {
-                NSString *status = [response objectForKey:@"status"];
-                if ([@"OK" isEqualToString:status]) {
-                    NSArray *predictions = [response objectForKey:@"predictions"];
-                    NSMutableArray *suggestions = [NSMutableArray array];
-                    for (NSDictionary *pred in predictions) {
-                        [suggestions addObject:pred[@"description"]];
-                    }
-                    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:suggestions];
-                } else {
-                    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:status];
+    [PluginUtil getJsonWithURL:[NSURL URLWithString:urlStr] completionBlock:^(BOOL succeeded, NSDictionary *response, NSString *error) {
+        CDVPluginResult* pluginResult;
+        if (!succeeded) {
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error ?: @"UNKNOWN_ERROR"];
+        } else {
+            NSString *status = [response objectForKey:@"status"];
+            if ([@"OK" isEqualToString:status]) {
+                NSArray *predictions = [response objectForKey:@"predictions"];
+                NSMutableArray *suggestions = [NSMutableArray array];
+                for (NSDictionary *pred in predictions) {
+                    [suggestions addObject:pred[@"description"]];
                 }
+                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:suggestions];
+            } else {
+                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:status];
             }
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-        }];
+        }
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
 }
 
