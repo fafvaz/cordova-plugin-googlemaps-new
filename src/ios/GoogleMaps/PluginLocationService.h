@@ -18,4 +18,5 @@
 @property (nonatomic, strong) NSMutableArray *locationCommandQueue;
 - (void)getMyLocation:(CDVInvokedUrlCommand*)command;
 - (void)hasPermission:(CDVInvokedUrlCommand*)command;
+- (void)getSuggestionsFromLocations:(CDVInvokedUrlCommand*)command;
 @end

@@ -4,6 +4,8 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
@@ -45,10 +47,18 @@ public class PluginLocationService extends CordovaPlugin {
   private final int ACTIVITY_LOCATION_PAGE = 0x7f999901;   // Open the location settings page
 
   private GoogleApiClient googleApiClient = null;
+  private String API_KEY = "";
 
   public void initialize(final CordovaInterface cordova, final CordovaWebView webView) {
     super.initialize(cordova, webView);
     activity = cordova.getActivity();
+
+    try {
+      ApplicationInfo ai = activity.getPackageManager().getApplicationInfo(activity.getPackageName(), PackageManager.GET_META_DATA);
+      this.API_KEY = ai.metaData.getString("com.google.android.geo.API_KEY");
+    } catch (Exception e) {
+      // ignore
+    }
   }
   private static Location lastLocation = null;
   private ArrayList<CallbackContext> regularAccuracyRequestList = new ArrayList<CallbackContext>();
@@ -72,6 +82,8 @@ public class PluginLocationService extends CordovaPlugin {
             PluginLocationService.this.getMyLocation(args, callbackContext);
           } else if ("hasPermission".equals(action)) {
             PluginLocationService.this.hasPermission(args, callbackContext);
+          } else if ("getSuggestionsFromLocations".equals(action)) {
+            PluginLocationService.this.getSuggestionsFromLocations(args, callbackContext);
           }
 
         } catch (JSONException e) {
@@ -659,6 +671,64 @@ public class PluginLocationService extends CordovaPlugin {
     synchronized (semaphore) {
       semaphore.notify();
     }
+  }
+
+  @SuppressWarnings("unused")
+  public void getSuggestionsFromLocations(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
+    final JSONObject opts = args.getJSONObject(0);
+
+    if (!opts.has("input") || opts.isNull("input") || opts.getString("input").isEmpty()) {
+      callbackContext.error("Missing required parameter: input");
+      return;
+    }
+
+    HashMap<String, String> params = new HashMap<String, String>();
+    params.put("input", opts.getString("input"));
+    params.put("key", this.API_KEY);
+
+    if (opts.has("language") && !opts.isNull("language")) {
+      params.put("language", opts.getString("language"));
+    }
+    if (opts.has("types") && !opts.isNull("types")) {
+      params.put("types", opts.getString("types"));
+    }
+    if (opts.has("country") && !opts.isNull("country")) {
+      params.put("components", "country:" + opts.getString("country"));
+    }
+
+    AsyncGetJsonWithURL httpGet = new AsyncGetJsonWithURL("https://maps.googleapis.com/maps/api/place/autocomplete/json", new AsyncHttpGetInterface() {
+      @Override
+      public void onPostExecute(JSONObject result) {
+        PluginResult pluginResult = null;
+        try {
+          if (result == null) {
+            pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
+          } else {
+            String status = result.getString("status");
+            if ("OK".equals(status)) {
+              JSONArray predictions = result.getJSONArray("predictions");
+              JSONArray suggestions = new JSONArray();
+              for (int i = 0; i < predictions.length(); i++) {
+                JSONObject pred = predictions.getJSONObject(i);
+                suggestions.put(pred.getString("description"));
+              }
+              pluginResult = new PluginResult(PluginResult.Status.OK, suggestions);
+            } else {
+              pluginResult = new PluginResult(PluginResult.Status.ERROR, status);
+            }
+          }
+        } catch (Exception e) {
+          pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
+        } finally {
+          if (pluginResult == null) {
+            pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
+          }
+          callbackContext.sendPluginResult(pluginResult);
+        }
+      }
+    });
+
+    httpGet.execute(params);
   }
 
 }

@@ -209,4 +209,62 @@
     }
 }
 
+/**
+ * Get location suggestions (autocomplete) using the Google Places API.
+ * Expected input: { input: "search text", language?: "en", types?: "establishment", country?: "us" }
+ * Returns: array of { place_id, description, structured_formatting }
+ */
+- (void)getSuggestionsFromLocations:(CDVInvokedUrlCommand *)command {
+    NSDictionary *opts = [command.arguments objectAtIndex:0];
+    
+    if (!opts[@"input"] || [[opts objectForKey:@"input"] isEqualToString:@""]) {
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Missing required parameter: input"];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        return;
+    }
+    
+    NSString *input = [opts objectForKey:@"input"];
+    NSString *encodedInput = [input stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
+    
+    NSString *urlStr = [NSString stringWithFormat:@"https://maps.googleapis.com/maps/api/place/autocomplete/json?input=%@", encodedInput];
+    
+    NSUserDefaults *myDefaults = [[NSUserDefaults alloc] initWithSuiteName:@"cordova.plugin.googlemaps"];
+    NSString *apiKey = [myDefaults objectForKey:@"GOOGLE_MAPS_API_KEY"];
+    if (apiKey) {
+        urlStr = [urlStr stringByAppendingFormat:@"&key=%@", apiKey];
+    }
+    
+    if (opts[@"language"]) {
+        urlStr = [urlStr stringByAppendingFormat:@"&language=%@", opts[@"language"]];
+    }
+    if (opts[@"types"]) {
+        urlStr = [urlStr stringByAppendingFormat:@"&types=%@", opts[@"types"]];
+    }
+    if (opts[@"country"]) {
+        urlStr = [urlStr stringByAppendingFormat:@"&components=country:%@", opts[@"country"]];
+    }
+    
+    [self.executeQueue addOperationWithBlock:^{
+        [PluginUtil getJsonWithURL:[NSURL URLWithString:urlStr] completionBlock:^(BOOL succeeded, NSDictionary *response, NSString *error) {
+            CDVPluginResult* pluginResult;
+            if (!succeeded) {
+                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error ?: @"UNKNOWN_ERROR"];
+            } else {
+                NSString *status = [response objectForKey:@"status"];
+                if ([@"OK" isEqualToString:status]) {
+                    NSArray *predictions = [response objectForKey:@"predictions"];
+                    NSMutableArray *suggestions = [NSMutableArray array];
+                    for (NSDictionary *pred in predictions) {
+                        [suggestions addObject:pred[@"description"]];
+                    }
+                    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:suggestions];
+                } else {
+                    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:status];
+                }
+            }
+            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        }];
+    }];
+}
+
 @end

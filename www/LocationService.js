@@ -72,6 +72,58 @@ var LocationService = function(exec) {
       } else {
         return new Promise(resolver);
       }
+    },
+    getSuggestionsFromLocations: function(arg1, arg2, arg3, arg4) {
+      var self = this;
+      var input, region, success_callback, errorCallback;
+
+      // Support two calling conventions:
+      // 1) getSuggestionsFromLocations(input, region, success, error)
+      // 2) getSuggestionsFromLocations({input, country}, success, error)
+      if (typeof arg1 === 'string') {
+        input = arg1;
+        region = arg2;
+        success_callback = arg3;
+        errorCallback = arg4;
+      } else if (typeof arg1 === 'object' && arg1 !== null) {
+        input = arg1.input;
+        region = arg1.country || arg1.region;
+        success_callback = arg2;
+        errorCallback = arg3;
+      } else if (typeof arg1 === 'function') {
+        success_callback = arg1;
+        errorCallback = arg2;
+      }
+
+      var params = { input: input };
+      if (region) {
+        params.country = region;
+      }
+
+      var resolver = function(resolve, reject) {
+        exec.call({
+          _isReady: true
+        },
+        function(suggestions) {
+          resolve.call(self, suggestions);
+        },
+        reject.bind(self), 'PluginLocationService', 'getSuggestionsFromLocations', [params], {sync: true});
+      };
+
+      var errorHandler = function(result) {
+        if (typeof errorCallback === 'function') {
+          errorCallback.call(self, result);
+        } else {
+          (self.errorHandler || _errorHandler).call(self, result);
+        }
+      };
+
+      if (typeof success_callback === 'function') {
+        resolver(success_callback, errorHandler);
+        return self;
+      } else {
+        return new Promise(resolver);
+      }
     }
   };
 };

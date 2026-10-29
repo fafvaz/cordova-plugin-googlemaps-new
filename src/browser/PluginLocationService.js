@@ -52,6 +52,13 @@ module.exports = {
         'error_message': 'Since this device does not have any location provider, this app can not detect your location.'
       });
     }
+  },
+  'getSuggestionsFromLocations': function(onSuccess, onError) {
+    onError({
+      'status': false,
+      'error_code': 'not_available',
+      'error_message': 'getSuggestionsFromLocations is not supported on the browser platform. Use the Geocoder API or call the Google Places API directly.'
+    });
   }
 };
 
