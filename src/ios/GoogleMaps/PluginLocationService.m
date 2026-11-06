@@ -282,17 +282,35 @@
                                               completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
                                                   [session finishTasksAndInvalidate];
 
+                                                  NSString *responseString = nil;
+                                                  if (data) {
+                                                      responseString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+                                                  }
+
                                                   if (error) {
-                                                      NSLog(@"[getSuggestionsFromLocations] error = %@", error.description);
-                                                      CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"UNKNOWN_ERROR"];
+                                                      NSLog(@"[getSuggestionsFromLocations] network error = %@", error.description);
+                                                      CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[NSString stringWithFormat:@"NETWORK_ERROR: %@", error.description]];
                                                       [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
                                                       return;
                                                   }
 
                                                   NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
                                                   if (httpResponse.statusCode < 200 || httpResponse.statusCode >= 300) {
-                                                      NSLog(@"[getSuggestionsFromLocations] HTTP error: %ld", (long)httpResponse.statusCode);
-                                                      CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"UNKNOWN_ERROR"];
+                                                      NSLog(@"[getSuggestionsFromLocations] HTTP error: %ld, body: %@", (long)httpResponse.statusCode, responseString ?: @"(empty)");
+                                                      NSString *errorMsg = [NSString stringWithFormat:@"HTTP_%ld", (long)httpResponse.statusCode];
+                                                      if (responseString) {
+                                                          NSError *parseError = nil;
+                                                          NSDictionary *errJson = [NSJSONSerialization JSONObjectWithData:data options:0 error:&parseError];
+                                                          if (errJson && [errJson objectForKey:@"error"]) {
+                                                              NSDictionary *err = [errJson objectForKey:@"error"];
+                                                              if ([err objectForKey:@"message"]) {
+                                                                  errorMsg = [NSString stringWithFormat:@"%@: %@", [err objectForKey:@"status"] ?: @"REQUEST_DENIED", [err objectForKey:@"message"]];
+                                                              }
+                                                          } else {
+                                                              errorMsg = [NSString stringWithFormat:@"%@: %@", errorMsg, responseString];
+                                                          }
+                                                      }
+                                                      CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:errorMsg];
                                                       [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
                                                       return;
                                                   }
@@ -301,6 +319,12 @@
                                                   if (data) {
                                                       NSError *__autoreleasing localError = nil;
                                                       json = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&localError];
+                                                      if (localError) {
+                                                          NSLog(@"[getSuggestionsFromLocations] JSON parse error: %@", localError.description);
+                                                          CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[NSString stringWithFormat:@"JSON_PARSE_ERROR: %@", localError.description]];
+                                                          [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+                                                          return;
+                                                      }
                                                   }
 
                                                   CDVPluginResult* pluginResult;

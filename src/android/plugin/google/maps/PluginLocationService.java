@@ -719,9 +719,38 @@ public class PluginLocationService extends CordovaPlugin {
         try {
           if (result == null) {
             pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
+          } else if (result.has("_httpStatus")) {
+            // Places API (New) returned an HTTP error; pass through Google's error message
+            int httpStatus = result.getInt("_httpStatus");
+            String errorMessage = "HTTP_" + httpStatus;
+            if (result.has("_errorBody")) {
+              Object errorBody = result.get("_errorBody");
+              if (errorBody instanceof JSONObject) {
+                JSONObject errObj = (JSONObject) errorBody;
+                if (errObj.has("error")) {
+                  JSONObject err = errObj.getJSONObject("error");
+                  if (err.has("message")) {
+                    errorMessage = err.getString("message");
+                  }
+                  if (err.has("status")) {
+                    errorMessage = err.getString("status") + ": " + errorMessage;
+                  }
+                } else if (errObj.has("message")) {
+                  errorMessage = errObj.getString("message");
+                } else {
+                  errorMessage = errorBody.toString();
+                }
+              } else {
+                errorMessage = errorBody.toString();
+              }
+            }
+            Log.e(TAG, "Places API (New) error: " + errorMessage);
+            JSONObject err = new JSONObject();
+            err.put("status", "REQUEST_DENIED");
+            err.put("error_message", errorMessage);
+            pluginResult = new PluginResult(PluginResult.Status.ERROR, err);
           } else {
-            // Places API (New) does not use a top-level "status" field for errors.
-            // HTTP error codes are used instead; a non-null JSON body means success.
+            // Success response
             JSONArray suggestions = result.optJSONArray("suggestions");
             JSONArray out = new JSONArray();
             if (suggestions != null) {
@@ -729,7 +758,6 @@ public class PluginLocationService extends CordovaPlugin {
                 JSONObject suggestion = suggestions.getJSONObject(i);
                 if (suggestion.has("placePrediction")) {
                   JSONObject pred = suggestion.getJSONObject("placePrediction");
-                  // Extract the display text from the new response format
                   String description = "";
                   if (pred.has("text")) {
                     JSONObject textObj = pred.getJSONObject("text");
@@ -737,7 +765,6 @@ public class PluginLocationService extends CordovaPlugin {
                       description = textObj.getString("text");
                     }
                   }
-                  // Fallback to structuredFormat.mainText.text
                   if (description.isEmpty() && pred.has("structuredFormat")) {
                     JSONObject sf = pred.getJSONObject("structuredFormat");
                     if (sf.has("mainText")) {

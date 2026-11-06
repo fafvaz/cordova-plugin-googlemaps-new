@@ -60,12 +60,38 @@ public class AsyncPostJsonWithURL extends AsyncTask<HashMap<String, Object>, Voi
       os.close();
 
       int status = http.getResponseCode();
+      String responseBody = null;
+      InputStream inputStream;
+
       if (status != HttpURLConnection.HTTP_OK) {
-        Log.e(TAG, "HTTP error: " + status);
-        return null;
+        // Read error response body from Places API (New)
+        inputStream = http.getErrorStream();
+        if (inputStream != null) {
+          ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+          int nRead;
+          byte[] data = new byte[16384];
+          while ((nRead = inputStream.read(data, 0, data.length)) != -1) {
+            buffer.write(data, 0, nRead);
+          }
+          buffer.flush();
+          inputStream.close();
+          responseBody = buffer.toString("UTF-8");
+        }
+        Log.e(TAG, "HTTP error: " + status + ", body: " + responseBody);
+        // Return a JSON object with the error details so the caller can pass them through
+        JSONObject errorResult = new JSONObject();
+        errorResult.put("_httpStatus", status);
+        if (responseBody != null) {
+          try {
+            errorResult.put("_errorBody", new JSONObject(responseBody));
+          } catch (Exception e) {
+            errorResult.put("_errorBody", responseBody);
+          }
+        }
+        return errorResult;
       }
 
-      InputStream inputStream = http.getInputStream();
+      inputStream = http.getInputStream();
       ByteArrayOutputStream buffer = new ByteArrayOutputStream();
       int nRead;
       byte[] data = new byte[16384];
