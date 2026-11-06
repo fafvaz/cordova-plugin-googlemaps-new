@@ -209,6 +209,7 @@
 
     <source-file src="src/android/plugin/google/maps/AsyncGetJsonWithURL.java" target-dir="src/plugin/google/maps"/>
     <source-file src="src/android/plugin/google/maps/AsyncHttpGetInterface.java" target-dir="src/plugin/google/maps"/>
+    <source-file src="src/android/plugin/google/maps/AsyncPostJsonWithURL.java" target-dir="src/plugin/google/maps"/>
     <source-file src="src/android/plugin/google/maps/AsyncLoadImage.java" target-dir="src/plugin/google/maps"/>
     <source-file src="src/android/plugin/google/maps/AsyncLoadImageInterface.java" target-dir="src/plugin/google/maps"/>
     <source-file src="src/android/plugin/google/maps/PluginEnvironment.java" target-dir="src/plugin/google/maps"/>

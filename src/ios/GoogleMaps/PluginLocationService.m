@@ -251,7 +251,7 @@
         [body setObject:opts[@"sessionToken"] forKey:@"sessionToken"];
     }
 
-    NSError *jsonError = nil;
+    __autoreleasing NSError *jsonError = nil;
     NSData *jsonBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:&jsonError];
     if (jsonError || !jsonBody) {
         NSLog(@"getSuggestionsFromLocations: failed to serialize JSON body: %@", jsonError);
