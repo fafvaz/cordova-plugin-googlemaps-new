@@ -216,24 +216,26 @@
  */
 - (void)getSuggestionsFromLocations:(CDVInvokedUrlCommand *)command {
     NSDictionary *opts = [command.arguments objectAtIndex:0];
-    
+
     if (!opts[@"input"] || [[opts objectForKey:@"input"] isEqualToString:@""]) {
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Missing required parameter: input"];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
         return;
     }
-    
+
     NSString *input = [opts objectForKey:@"input"];
     NSString *encodedInput = [input stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
-    
+
     NSString *urlStr = [NSString stringWithFormat:@"https://maps.googleapis.com/maps/api/place/autocomplete/json?input=%@", encodedInput];
-    
+
     NSUserDefaults *myDefaults = [[NSUserDefaults alloc] initWithSuiteName:@"cordova.plugin.googlemaps"];
     NSString *apiKey = [myDefaults objectForKey:@"GOOGLE_MAPS_API_KEY"];
     if (apiKey) {
         urlStr = [urlStr stringByAppendingFormat:@"&key=%@", apiKey];
+    } else {
+        NSLog(@"getSuggestionsFromLocations: GOOGLE_MAPS_API_KEY is not set in NSUserDefaults");
     }
-    
+
     if (opts[@"language"]) {
         urlStr = [urlStr stringByAppendingFormat:@"&language=%@", opts[@"language"]];
     }
@@ -243,14 +245,14 @@
     if (opts[@"country"]) {
         urlStr = [urlStr stringByAppendingFormat:@"&components=country:%@", opts[@"country"]];
     }
-    
+
     [PluginUtil getJsonWithURL:[NSURL URLWithString:urlStr] completionBlock:^(BOOL succeeded, NSDictionary *response, NSString *error) {
         CDVPluginResult* pluginResult;
         if (!succeeded) {
             pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error ?: @"UNKNOWN_ERROR"];
         } else {
             NSString *status = [response objectForKey:@"status"];
-            if ([@"OK" isEqualToString:status]) {
+            if ([@"OK" isEqualToString:status] || [@"ZERO_RESULTS" isEqualToString:status]) {
                 NSArray *predictions = [response objectForKey:@"predictions"];
                 NSMutableArray *suggestions = [NSMutableArray array];
                 for (NSDictionary *pred in predictions) {
@@ -258,7 +260,11 @@
                 }
                 pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:suggestions];
             } else {
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:status];
+                NSDictionary *err = @{
+                    @"status": status ?: @"UNKNOWN_ERROR",
+                    @"error_message": response[@"error_message"] ?: @""
+                };
+                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:err];
             }
         }
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];

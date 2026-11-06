@@ -673,7 +673,7 @@ public class PluginLocationService extends CordovaPlugin {
     }
   }
 
-  @SuppressWarnings("unused")
+    @SuppressWarnings("unused")
   public void getSuggestionsFromLocations(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
     final JSONObject opts = args.getJSONObject(0);
 
@@ -705,16 +705,21 @@ public class PluginLocationService extends CordovaPlugin {
             pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
           } else {
             String status = result.getString("status");
-            if ("OK".equals(status)) {
-              JSONArray predictions = result.getJSONArray("predictions");
+            if ("OK".equals(status) || "ZERO_RESULTS".equals(status)) {
+              JSONArray predictions = result.optJSONArray("predictions");
               JSONArray suggestions = new JSONArray();
-              for (int i = 0; i < predictions.length(); i++) {
-                JSONObject pred = predictions.getJSONObject(i);
-                suggestions.put(pred.getString("description"));
+              if (predictions != null) {
+                for (int i = 0; i < predictions.length(); i++) {
+                  JSONObject pred = predictions.getJSONObject(i);
+                  suggestions.put(pred.getString("description"));
+                }
               }
               pluginResult = new PluginResult(PluginResult.Status.OK, suggestions);
             } else {
-              pluginResult = new PluginResult(PluginResult.Status.ERROR, status);
+              JSONObject err = new JSONObject();
+              err.put("status", status);
+              err.put("error_message", result.optString("error_message", ""));
+              pluginResult = new PluginResult(PluginResult.Status.ERROR, err);
             }
           }
         } catch (Exception e) {
