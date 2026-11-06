@@ -223,52 +223,116 @@
         return;
     }
 
-    NSString *input = [opts objectForKey:@"input"];
-    NSString *encodedInput = [input stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
+    NSMutableDictionary *body = [NSMutableDictionary dictionary];
+    [body setObject:opts[@"input"] forKey:@"input"];
 
-    NSString *urlStr = [NSString stringWithFormat:@"https://maps.googleapis.com/maps/api/place/autocomplete/json?input=%@", encodedInput];
+    if (opts[@"language"]) {
+        [body setObject:opts[@"language"] forKey:@"languageCode"];
+    }
+    if (opts[@"types"]) {
+        [body setObject:opts[@"types"] forKey:@"includedPrimaryTypes"];
+    }
+    if (opts[@"country"]) {
+        [body setObject:opts[@"country"] forKey:@"regionCode"];
+    }
+    if (opts[@"locationBias"]) {
+        [body setObject:opts[@"locationBias"] forKey:@"locationBias"];
+    }
+    if (opts[@"locationRestriction"]) {
+        [body setObject:opts[@"locationRestriction"] forKey:@"locationRestriction"];
+    }
+    if (opts[@"origin"]) {
+        [body setObject:opts[@"origin"] forKey:@"origin"];
+    }
+    if (opts[@"inputOffset"]) {
+        [body setObject:opts[@"inputOffset"] forKey:@"inputOffset"];
+    }
+    if (opts[@"sessionToken"]) {
+        [body setObject:opts[@"sessionToken"] forKey:@"sessionToken"];
+    }
+
+    NSError *jsonError = nil;
+    NSData *jsonBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:&jsonError];
+    if (jsonError || !jsonBody) {
+        NSLog(@"getSuggestionsFromLocations: failed to serialize JSON body: %@", jsonError);
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"UNKNOWN_ERROR"];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        return;
+    }
+
+    NSURL *url = [NSURL URLWithString:@"https://places.googleapis.com/v1/places:autocomplete"];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    [request setHTTPMethod:@"POST"];
+    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
+    [request setHTTPBody:jsonBody];
 
     NSUserDefaults *myDefaults = [[NSUserDefaults alloc] initWithSuiteName:@"cordova.plugin.googlemaps"];
     NSString *apiKey = [myDefaults objectForKey:@"GOOGLE_MAPS_API_KEY"];
     if (apiKey) {
-        urlStr = [urlStr stringByAppendingFormat:@"&key=%@", apiKey];
+        [request setValue:apiKey forHTTPHeaderField:@"X-Goog-Api-Key"];
     } else {
         NSLog(@"getSuggestionsFromLocations: GOOGLE_MAPS_API_KEY is not set in NSUserDefaults");
     }
+    [request setValue:@"suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat" forHTTPHeaderField:@"X-Goog-FieldMask"];
 
-    if (opts[@"language"]) {
-        urlStr = [urlStr stringByAppendingFormat:@"&language=%@", opts[@"language"]];
-    }
-    if (opts[@"types"]) {
-        urlStr = [urlStr stringByAppendingFormat:@"&types=%@", opts[@"types"]];
-    }
-    if (opts[@"country"]) {
-        urlStr = [urlStr stringByAppendingFormat:@"&components=country:%@", opts[@"country"]];
-    }
+    NSURLSessionConfiguration *sessionConfiguration = [NSURLSessionConfiguration defaultSessionConfiguration];
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:sessionConfiguration];
+    NSURLSessionDataTask *postTask = [session dataTaskWithRequest:request
+                                              completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                                                  [session finishTasksAndInvalidate];
 
-    [PluginUtil getJsonWithURL:[NSURL URLWithString:urlStr] completionBlock:^(BOOL succeeded, NSDictionary *response, NSString *error) {
-        CDVPluginResult* pluginResult;
-        if (!succeeded) {
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error ?: @"UNKNOWN_ERROR"];
-        } else {
-            NSString *status = [response objectForKey:@"status"];
-            if ([@"OK" isEqualToString:status] || [@"ZERO_RESULTS" isEqualToString:status]) {
-                NSArray *predictions = [response objectForKey:@"predictions"];
-                NSMutableArray *suggestions = [NSMutableArray array];
-                for (NSDictionary *pred in predictions) {
-                    [suggestions addObject:pred[@"description"]];
-                }
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:suggestions];
-            } else {
-                NSDictionary *err = @{
-                    @"status": status ?: @"UNKNOWN_ERROR",
-                    @"error_message": response[@"error_message"] ?: @""
-                };
-                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:err];
-            }
-        }
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }];
+                                                  if (error) {
+                                                      NSLog(@"[getSuggestionsFromLocations] error = %@", error.description);
+                                                      CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"UNKNOWN_ERROR"];
+                                                      [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+                                                      return;
+                                                  }
+
+                                                  NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+                                                  if (httpResponse.statusCode < 200 || httpResponse.statusCode >= 300) {
+                                                      NSLog(@"[getSuggestionsFromLocations] HTTP error: %ld", (long)httpResponse.statusCode);
+                                                      CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"UNKNOWN_ERROR"];
+                                                      [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+                                                      return;
+                                                  }
+
+                                                  NSDictionary *json = nil;
+                                                  if (data) {
+                                                      json = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&jsonError];
+                                                  }
+
+                                                  CDVPluginResult* pluginResult;
+                                                  if (!json) {
+                                                      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"UNKNOWN_ERROR"];
+                                                  } else {
+                                                      NSArray *suggestions = [json objectForKey:@"suggestions"];
+                                                      NSMutableArray *out = [NSMutableArray array];
+                                                      for (NSDictionary *suggestion in suggestions) {
+                                                          NSDictionary *pred = [suggestion objectForKey:@"placePrediction"];
+                                                          if (pred) {
+                                                              NSString *description = @"";
+                                                              NSDictionary *textObj = [pred objectForKey:@"text"];
+                                                              if (textObj) {
+                                                                  description = [textObj objectForKey:@"text"] ?: @"";
+                                                              }
+                                                              if ([description isEqualToString:@""]) {
+                                                                  NSDictionary *sf = [pred objectForKey:@"structuredFormat"];
+                                                                  if (sf) {
+                                                                      NSDictionary *mainText = [sf objectForKey:@"mainText"];
+                                                                      if (mainText) {
+                                                                          description = [mainText objectForKey:@"text"] ?: @"";
+                                                                      }
+                                                                  }
+                                                              }
+                                                              [out addObject:description];
+                                                          }
+                                                      }
+                                                      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:out];
+                                                  }
+                                                  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+                                              }];
+    [postTask resume];
 }
 
 @end

@@ -76,28 +76,41 @@ var LocationService = function(exec) {
     getSuggestionsFromLocations: function(arg1, arg2, arg3, arg4) {
       var self = this;
       var input, region, success_callback, errorCallback;
+      var params = {};
 
       // Support two calling conventions:
       // 1) getSuggestionsFromLocations(input, region, success, error)
-      // 2) getSuggestionsFromLocations({input, country}, success, error)
+      // 2) getSuggestionsFromLocations({input, country, language, types, locationBias, ...}, success, error)
       if (typeof arg1 === 'string') {
         input = arg1;
         region = arg2;
         success_callback = arg3;
         errorCallback = arg4;
+        params.input = input;
+        if (region) {
+          params.region = region;
+        }
       } else if (typeof arg1 === 'object' && arg1 !== null) {
         input = arg1.input;
         region = arg1.country || arg1.region;
         success_callback = arg2;
         errorCallback = arg3;
+        // Pass through all supported Places API (New) parameters
+        params.input = input;
+        if (arg1.country) params.country = arg1.country;
+        if (arg1.region) params.region = arg1.region;
+        if (arg1.language) params.language = arg1.language;
+        if (arg1.languageCode) params.languageCode = arg1.languageCode;
+        if (arg1.types) params.types = arg1.types;
+        if (arg1.includedPrimaryTypes) params.includedPrimaryTypes = arg1.includedPrimaryTypes;
+        if (arg1.locationBias) params.locationBias = arg1.locationBias;
+        if (arg1.locationRestriction) params.locationRestriction = arg1.locationRestriction;
+        if (arg1.origin) params.origin = arg1.origin;
+        if (arg1.inputOffset) params.inputOffset = arg1.inputOffset;
+        if (arg1.sessionToken) params.sessionToken = arg1.sessionToken;
       } else if (typeof arg1 === 'function') {
         success_callback = arg1;
         errorCallback = arg2;
-      }
-
-      var params = { input: input };
-      if (region) {
-        params.country = region;
       }
 
       var resolver = function(resolve, reject) {

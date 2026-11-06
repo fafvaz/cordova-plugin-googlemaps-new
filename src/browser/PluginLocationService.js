@@ -53,11 +53,84 @@ module.exports = {
       });
     }
   },
-  'getSuggestionsFromLocations': function(onSuccess, onError) {
-    onError({
-      'status': false,
-      'error_code': 'not_available',
-      'error_message': 'getSuggestionsFromLocations is not supported on the browser platform. Use the Geocoder API or call the Google Places API directly.'
+  'getSuggestionsFromLocations': function(options, onSuccess, onError) {
+    // Support legacy calling convention: getSuggestionsFromLocations(onSuccess, onError)
+    if (typeof options === 'function') {
+      onError = onSuccess;
+      onSuccess = options;
+      options = {};
+    }
+
+    var input = options && options.input;
+    if (!input) {
+      onError({
+        'status': false,
+        'error_code': 'invalid_request',
+        'error_message': 'Missing required parameter: input'
+      });
+      return;
+    }
+
+    // Resolve API key from environment or options
+    var apiKey = options.apiKey || '';
+    try {
+      var env = (typeof Environment !== 'undefined' && Environment._getEnv) ? Environment._getEnv() : null;
+      if (env && env.API_KEY_FOR_BROWSER_RELEASE) {
+        apiKey = env.API_KEY_FOR_BROWSER_RELEASE;
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // Build JSON request body for Places API (New) Autocomplete
+    var body = { input: input };
+    if (options.languageCode) body.languageCode = options.languageCode;
+    else if (options.language) body.languageCode = options.language;
+    if (options.includedPrimaryTypes) body.includedPrimaryTypes = options.includedPrimaryTypes;
+    else if (options.types) body.includedPrimaryTypes = options.types;
+    if (options.regionCode) body.regionCode = options.regionCode;
+    else if (options.country) body.regionCode = options.country;
+    if (options.locationBias) body.locationBias = options.locationBias;
+    if (options.locationRestriction) body.locationRestriction = options.locationRestriction;
+    if (options.origin) body.origin = options.origin;
+    if (options.inputOffset) body.inputOffset = options.inputOffset;
+    if (options.sessionToken) body.sessionToken = options.sessionToken;
+
+    fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat'
+      },
+      body: JSON.stringify(body)
+    })
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      return response.json();
+    })
+    .then(function(data) {
+      var suggestions = data.suggestions || [];
+      var out = suggestions.map(function(s) {
+        var pred = s.placePrediction || {};
+        var text = '';
+        if (pred.text && pred.text.text) {
+          text = pred.text.text;
+        } else if (pred.structuredFormat && pred.structuredFormat.mainText && pred.structuredFormat.mainText.text) {
+          text = pred.structuredFormat.mainText.text;
+        }
+        return text;
+      });
+      onSuccess(out);
+    })
+    .catch(function(err) {
+      onError({
+        'status': false,
+        'error_code': 'request_failed',
+        'error_message': err.message || 'UNKNOWN_ERROR'
+      });
     });
   }
 };

@@ -682,21 +682,37 @@ public class PluginLocationService extends CordovaPlugin {
       return;
     }
 
-    HashMap<String, String> params = new HashMap<String, String>();
-    params.put("input", opts.getString("input"));
-    params.put("key", this.API_KEY);
+    // Build JSON request body for Places API (New) Autocomplete
+    HashMap<String, Object> body = new HashMap<String, Object>();
+    body.put("input", opts.getString("input"));
 
     if (opts.has("language") && !opts.isNull("language")) {
-      params.put("language", opts.getString("language"));
+      body.put("languageCode", opts.getString("language"));
     }
     if (opts.has("types") && !opts.isNull("types")) {
-      params.put("types", opts.getString("types"));
+      body.put("includedPrimaryTypes", opts.getString("types"));
     }
     if (opts.has("country") && !opts.isNull("country")) {
-      params.put("components", "country:" + opts.getString("country"));
+      body.put("regionCode", opts.getString("country"));
+    }
+    if (opts.has("locationBias") && !opts.isNull("locationBias")) {
+      body.put("locationBias", opts.get("locationBias"));
+    }
+    if (opts.has("locationRestriction") && !opts.isNull("locationRestriction")) {
+      body.put("locationRestriction", opts.get("locationRestriction"));
+    }
+    if (opts.has("origin") && !opts.isNull("origin")) {
+      body.put("origin", opts.get("origin"));
+    }
+    if (opts.has("inputOffset") && !opts.isNull("inputOffset")) {
+      body.put("inputOffset", opts.getInt("inputOffset"));
+    }
+    if (opts.has("sessionToken") && !opts.isNull("sessionToken")) {
+      body.put("sessionToken", opts.getString("sessionToken"));
     }
 
-    AsyncGetJsonWithURL httpGet = new AsyncGetJsonWithURL("https://maps.googleapis.com/maps/api/place/autocomplete/json", new AsyncHttpGetInterface() {
+    // Place Autocomplete (New) endpoint
+    AsyncPostJsonWithURL httpPost = new AsyncPostJsonWithURL("https://places.googleapis.com/v1/places:autocomplete", new AsyncPostJsonWithURL.AsyncHttpPostInterface() {
       @Override
       public void onPostExecute(JSONObject result) {
         PluginResult pluginResult = null;
@@ -704,25 +720,41 @@ public class PluginLocationService extends CordovaPlugin {
           if (result == null) {
             pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
           } else {
-            String status = result.getString("status");
-            if ("OK".equals(status) || "ZERO_RESULTS".equals(status)) {
-              JSONArray predictions = result.optJSONArray("predictions");
-              JSONArray suggestions = new JSONArray();
-              if (predictions != null) {
-                for (int i = 0; i < predictions.length(); i++) {
-                  JSONObject pred = predictions.getJSONObject(i);
-                  suggestions.put(pred.getString("description"));
+            // Places API (New) does not use a top-level "status" field for errors.
+            // HTTP error codes are used instead; a non-null JSON body means success.
+            JSONArray suggestions = result.optJSONArray("suggestions");
+            JSONArray out = new JSONArray();
+            if (suggestions != null) {
+              for (int i = 0; i < suggestions.length(); i++) {
+                JSONObject suggestion = suggestions.getJSONObject(i);
+                if (suggestion.has("placePrediction")) {
+                  JSONObject pred = suggestion.getJSONObject("placePrediction");
+                  // Extract the display text from the new response format
+                  String description = "";
+                  if (pred.has("text")) {
+                    JSONObject textObj = pred.getJSONObject("text");
+                    if (textObj.has("text")) {
+                      description = textObj.getString("text");
+                    }
+                  }
+                  // Fallback to structuredFormat.mainText.text
+                  if (description.isEmpty() && pred.has("structuredFormat")) {
+                    JSONObject sf = pred.getJSONObject("structuredFormat");
+                    if (sf.has("mainText")) {
+                      JSONObject mainText = sf.getJSONObject("mainText");
+                      if (mainText.has("text")) {
+                        description = mainText.getString("text");
+                      }
+                    }
+                  }
+                  out.put(description);
                 }
               }
-              pluginResult = new PluginResult(PluginResult.Status.OK, suggestions);
-            } else {
-              JSONObject err = new JSONObject();
-              err.put("status", status);
-              err.put("error_message", result.optString("error_message", ""));
-              pluginResult = new PluginResult(PluginResult.Status.ERROR, err);
             }
+            pluginResult = new PluginResult(PluginResult.Status.OK, out);
           }
         } catch (Exception e) {
+          e.printStackTrace();
           pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
         } finally {
           if (pluginResult == null) {
@@ -733,7 +765,12 @@ public class PluginLocationService extends CordovaPlugin {
       }
     });
 
-    httpGet.execute(params);
+    // Set required headers for Places API (New)
+    httpPost.setHeader("X-Goog-Api-Key", this.API_KEY);
+    httpPost.setHeader("X-Goog-FieldMask",
+        "suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat");
+
+    httpPost.execute(body);
   }
 
 }
