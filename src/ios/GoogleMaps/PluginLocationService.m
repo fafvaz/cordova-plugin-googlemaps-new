@@ -299,7 +299,8 @@
 
                                                   NSDictionary *json = nil;
                                                   if (data) {
-                                                      json = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&jsonError];
+                                                      NSError *__autoreleasing localError = nil;
+                                                      json = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&localError];
                                                   }
 
                                                   CDVPluginResult* pluginResult;
