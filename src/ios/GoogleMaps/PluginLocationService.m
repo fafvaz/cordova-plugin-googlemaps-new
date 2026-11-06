@@ -223,6 +223,8 @@
         return;
     }
 
+    NSLog(@"[getSuggestionsFromLocations] called with input=%@, country=%@, language=%@, types=%@", opts[@"input"] ?: @"(null)", opts[@"country"] ?: @"(null)", opts[@"language"] ?: @"(null)", opts[@"types"] ?: @"(null)");
+
     NSMutableDictionary *body = [NSMutableDictionary dictionary];
     [body setObject:opts[@"input"] forKey:@"input"];
 
@@ -254,11 +256,12 @@
     __autoreleasing NSError *jsonError = nil;
     NSData *jsonBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:&jsonError];
     if (jsonError || !jsonBody) {
-        NSLog(@"getSuggestionsFromLocations: failed to serialize JSON body: %@", jsonError);
-        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"UNKNOWN_ERROR"];
+        NSLog(@"[getSuggestionsFromLocations] failed to serialize JSON body: %@", jsonError);
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"JSON_SERIALIZE_ERROR"];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
         return;
     }
+    NSLog(@"[getSuggestionsFromLocations] request body: %@", [[NSString alloc] initWithData:jsonBody encoding:NSUTF8StringEncoding]);
 
     NSURL *url = [NSURL URLWithString:@"https://places.googleapis.com/v1/places:autocomplete"];
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
@@ -270,9 +273,10 @@
     NSUserDefaults *myDefaults = [[NSUserDefaults alloc] initWithSuiteName:@"cordova.plugin.googlemaps"];
     NSString *apiKey = [myDefaults objectForKey:@"GOOGLE_MAPS_API_KEY"];
     if (apiKey) {
+        NSLog(@"[getSuggestionsFromLocations] API key found (length=%lu)", (unsigned long)apiKey.length);
         [request setValue:apiKey forHTTPHeaderField:@"X-Goog-Api-Key"];
     } else {
-        NSLog(@"getSuggestionsFromLocations: GOOGLE_MAPS_API_KEY is not set in NSUserDefaults");
+        NSLog(@"[getSuggestionsFromLocations] GOOGLE_MAPS_API_KEY is NOT set in NSUserDefaults");
     }
     [request setValue:@"suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat" forHTTPHeaderField:@"X-Goog-FieldMask"];
 
@@ -329,7 +333,8 @@
 
                                                   CDVPluginResult* pluginResult;
                                                   if (!json) {
-                                                      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"UNKNOWN_ERROR"];
+                                                      NSLog(@"[getSuggestionsFromLocations] json is nil after 2xx response (no data or parse issue)");
+                                                      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"NO_RESPONSE_DATA"];
                                                   } else {
                                                       NSArray *suggestions = [json objectForKey:@"suggestions"];
                                                       NSMutableArray *out = [NSMutableArray array];
@@ -354,6 +359,7 @@
                                                           }
                                                       }
                                                       pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:out];
+                                                      NSLog(@"[getSuggestionsFromLocations] success: %lu suggestions returned", (unsigned long)out.count);
                                                   }
                                                   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
                                               }];

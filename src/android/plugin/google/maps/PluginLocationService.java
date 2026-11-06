@@ -682,6 +682,12 @@ public class PluginLocationService extends CordovaPlugin {
       return;
     }
 
+    String inputVal = opts.has("input") && !opts.isNull("input") ? opts.getString("input") : "null";
+    String countryVal = opts.has("country") && !opts.isNull("country") ? opts.getString("country") : "null";
+    String languageVal = opts.has("language") && !opts.isNull("language") ? opts.getString("language") : "null";
+    String typesVal = opts.has("types") && !opts.isNull("types") ? opts.getString("types") : "null";
+    Log.d(TAG, "[getSuggestionsFromLocations] called with input=" + inputVal + ", country=" + countryVal + ", language=" + languageVal + ", types=" + typesVal);
+
     // Build JSON request body for Places API (New) Autocomplete
     HashMap<String, Object> body = new HashMap<String, Object>();
     body.put("input", opts.getString("input"));
@@ -711,6 +717,20 @@ public class PluginLocationService extends CordovaPlugin {
       body.put("sessionToken", opts.getString("sessionToken"));
     }
 
+    // Log request body
+    try {
+      Log.d(TAG, "[getSuggestionsFromLocations] request body: " + new JSONObject(body).toString());
+    } catch (Exception e) {
+      Log.e(TAG, "[getSuggestionsFromLocations] failed to log request body", e);
+    }
+
+    // Log API key status
+    if (this.API_KEY != null && !this.API_KEY.isEmpty()) {
+      Log.d(TAG, "[getSuggestionsFromLocations] API key found (length=" + this.API_KEY.length() + ")");
+    } else {
+      Log.e(TAG, "[getSuggestionsFromLocations] API_KEY is empty or null");
+    }
+
     // Place Autocomplete (New) endpoint
     AsyncPostJsonWithURL httpPost = new AsyncPostJsonWithURL("https://places.googleapis.com/v1/places:autocomplete", new AsyncPostJsonWithURL.AsyncHttpPostInterface() {
       @Override
@@ -718,7 +738,8 @@ public class PluginLocationService extends CordovaPlugin {
         PluginResult pluginResult = null;
         try {
           if (result == null) {
-            pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
+            Log.e(TAG, "Places API (New): result is null (network/connection failure)");
+            pluginResult = new PluginResult(PluginResult.Status.ERROR, "CONNECTION_FAILED");
           } else if (result.has("_httpStatus")) {
             // Places API (New) returned an HTTP error; pass through Google's error message
             int httpStatus = result.getInt("_httpStatus");
@@ -779,10 +800,11 @@ public class PluginLocationService extends CordovaPlugin {
               }
             }
             pluginResult = new PluginResult(PluginResult.Status.OK, out);
+            Log.d(TAG, "[getSuggestionsFromLocations] success: " + out.length() + " suggestions returned");
           }
         } catch (Exception e) {
-          e.printStackTrace();
-          pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
+          Log.e(TAG, "[getSuggestionsFromLocations] exception: " + e.getMessage(), e);
+          pluginResult = new PluginResult(PluginResult.Status.ERROR, "EXCEPTION: " + e.getMessage());
         } finally {
           if (pluginResult == null) {
             pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
@@ -797,6 +819,7 @@ public class PluginLocationService extends CordovaPlugin {
     httpPost.setHeader("X-Goog-FieldMask",
         "suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat");
 
+    Log.d(TAG, "[getSuggestionsFromLocations] executing POST to https://places.googleapis.com/v1/places:autocomplete");
     httpPost.execute(body);
   }
 
