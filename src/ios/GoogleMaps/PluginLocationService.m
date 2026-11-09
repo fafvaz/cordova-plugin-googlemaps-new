@@ -275,6 +275,15 @@
     if (apiKey) {
         NSLog(@"[getSuggestionsFromLocations] API key found (length=%lu)", (unsigned long)apiKey.length);
         [request setValue:apiKey forHTTPHeaderField:@"X-Goog-Api-Key"];
+        
+        // Send iOS Bundle ID so Google can verify the client application
+        NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+        if (bundleId) {
+            [request setValue:bundleId forHTTPHeaderField:@"X-Ios-Bundle-Identifier"];
+            NSLog(@"[getSuggestionsFromLocations] iOS Bundle ID: %@", bundleId);
+        } else {
+            NSLog(@"[getSuggestionsFromLocations] WARNING: iOS Bundle ID is nil");
+        }
     } else {
         NSLog(@"[getSuggestionsFromLocations] GOOGLE_MAPS_API_KEY is NOT set in NSUserDefaults");
     }
