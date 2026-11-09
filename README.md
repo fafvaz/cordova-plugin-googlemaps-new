@@ -116,7 +116,9 @@ certificate used to sign the MABS build to the API key's Android application
 restrictions. If the key has API restrictions, allow both Places API (New) and
 Maps SDK for Android. Use the production signing certificate for production
 builds; a debug or different signing certificate will not match. The Places SDK
-requires AndroidX and a minimum Android SDK version of 23.
+requires AndroidX and a minimum Android SDK version of 23. The plugin pins
+Places SDK 3.5.0 for compatibility with the Kotlin 1.9 compiler used by MABS
+12.1; newer SDK versions may require a newer MABS Kotlin toolchain.
 
 On iOS, Places Autocomplete uses the Places API (New) web service and sends the
 app's bundle identifier with the request. Configure a separate iOS API key and

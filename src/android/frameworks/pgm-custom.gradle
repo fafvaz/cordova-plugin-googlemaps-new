@@ -107,7 +107,8 @@ android {
     dependencies {
         implementation "com.google.android.gms:play-services-maps:${PLAY_SERVICES_MAPS_VERSION}"
         implementation "com.google.android.gms:play-services-location:${PLAY_SERVICES_LOCATION_VERSION}"
-        implementation "com.google.android.libraries.places:places:6.0.2"
+        // Places 3.5.0 supports Autocomplete (New) and is compatible with MABS Kotlin 1.9.
+        implementation "com.google.android.libraries.places:places:3.5.0"
     }
 
     // -------------------------------------------------------------------------
