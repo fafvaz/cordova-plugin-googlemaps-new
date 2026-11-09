@@ -236,6 +236,8 @@
     }
     if (opts[@"country"]) {
         [body setObject:opts[@"country"] forKey:@"regionCode"];
+    } else if (opts[@"region"]) {
+        [body setObject:opts[@"region"] forKey:@"regionCode"];
     }
     if (opts[@"locationBias"]) {
         [body setObject:opts[@"locationBias"] forKey:@"locationBias"];

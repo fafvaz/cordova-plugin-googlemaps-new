@@ -781,6 +781,8 @@ public class PluginLocationService extends CordovaPlugin {
 
       if (opts.has("country") && !opts.isNull("country")) {
         requestBuilder.setRegionCode(opts.getString("country"));
+      } else if (opts.has("region") && !opts.isNull("region")) {
+        requestBuilder.setRegionCode(opts.getString("region"));
       }
       if (opts.has("types") && !opts.isNull("types")) {
         ArrayList<String> types = new ArrayList<String>();

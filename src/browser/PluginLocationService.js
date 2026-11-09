@@ -90,6 +90,7 @@ module.exports = {
     else if (options.types) body.includedPrimaryTypes = options.types;
     if (options.regionCode) body.regionCode = options.regionCode;
     else if (options.country) body.regionCode = options.country;
+    else if (options.region) body.regionCode = options.region;
     if (options.locationBias) body.locationBias = options.locationBias;
     if (options.locationRestriction) body.locationRestriction = options.locationRestriction;
     if (options.origin) body.origin = options.origin;
