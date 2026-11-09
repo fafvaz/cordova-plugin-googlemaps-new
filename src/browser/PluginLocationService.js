@@ -86,11 +86,19 @@ module.exports = {
     var body = { input: input };
     if (options.languageCode) body.languageCode = options.languageCode;
     else if (options.language) body.languageCode = options.language;
-    if (options.includedPrimaryTypes) body.includedPrimaryTypes = options.includedPrimaryTypes;
-    else if (options.types) body.includedPrimaryTypes = options.types;
+    var primaryTypes = options.includedPrimaryTypes || options.types;
+    if (primaryTypes) {
+      body.includedPrimaryTypes = typeof primaryTypes === 'string' ?
+        primaryTypes.split(',').map(function(type) { return type.trim(); }).filter(Boolean) :
+        primaryTypes;
+    }
     if (options.regionCode) body.regionCode = options.regionCode;
     else if (options.country) body.regionCode = options.country;
     else if (options.region) body.regionCode = options.region;
+    if (options.includedRegionCodes) body.includedRegionCodes = options.includedRegionCodes;
+    if (options.includeQueryPredictions !== undefined) {
+      body.includeQueryPredictions = options.includeQueryPredictions;
+    }
     if (options.locationBias) body.locationBias = options.locationBias;
     if (options.locationRestriction) body.locationRestriction = options.locationRestriction;
     if (options.origin) body.origin = options.origin;
@@ -102,7 +110,7 @@ module.exports = {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat'
+        'X-Goog-FieldMask': 'suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat,suggestions.queryPrediction.text'
       },
       body: JSON.stringify(body)
     })
@@ -115,7 +123,7 @@ module.exports = {
     .then(function(data) {
       var suggestions = data.suggestions || [];
       var out = suggestions.map(function(s) {
-        var pred = s.placePrediction || {};
+        var pred = s.placePrediction || s.queryPrediction || {};
         var text = '';
         if (pred.text && pred.text.text) {
           text = pred.text.text;

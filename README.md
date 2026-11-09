@@ -124,6 +124,17 @@ restrict it to the exact bundle identifier used by the MABS build. Enable Places
 API (New), and allow both Places API (New) and Maps SDK for iOS in the API
 restrictions. Android- and iOS-restricted keys are not interchangeable.
 
+`LocationService.getSuggestionsFromLocations` returns an array of suggestion
+text strings on every platform. It accepts `input`, `regionCode` (or the legacy
+`region`/`country` aliases), `languageCode` (or `language`), `includedPrimaryTypes`
+(or `types`), `includedRegionCodes`, `includeQueryPredictions`, `locationBias`,
+`locationRestriction`, `origin`, `inputOffset`, and `sessionToken`. On Android,
+the native Places SDK uses the device language and does not support per-request
+`languageCode` or `includeQueryPredictions`; requesting either returns an error
+instead of silently ignoring it. Android supports `includedRegionCodes` as a
+country restriction. `regionCode` only biases/formats results; it does not
+restrict them to a country.
+
 For the browser platform you need to specify the API-Key in JavaScript before calling `plugin.google.maps.Map.getMap()`:
 
 ```js

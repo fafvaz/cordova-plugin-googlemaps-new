@@ -103,6 +103,9 @@ var LocationService = function(exec) {
         if (arg1.languageCode) params.languageCode = arg1.languageCode;
         if (arg1.types) params.types = arg1.types;
         if (arg1.includedPrimaryTypes) params.includedPrimaryTypes = arg1.includedPrimaryTypes;
+        if (arg1.includedRegionCodes) params.includedRegionCodes = arg1.includedRegionCodes;
+        if (arg1.includeQueryPredictions !== undefined) params.includeQueryPredictions = arg1.includeQueryPredictions;
+        if (arg1.regionCode) params.regionCode = arg1.regionCode;
         if (arg1.locationBias) params.locationBias = arg1.locationBias;
         if (arg1.locationRestriction) params.locationRestriction = arg1.locationRestriction;
         if (arg1.origin) params.origin = arg1.origin;

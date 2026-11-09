@@ -764,13 +764,20 @@ public class PluginLocationService extends CordovaPlugin {
     }
 
     String inputVal = opts.getString("input");
-    String countryVal = opts.has("country") && !opts.isNull("country") ? opts.getString("country") : "null";
-    String languageVal = opts.has("language") && !opts.isNull("language") ? opts.getString("language") : "null";
-    String typesVal = opts.has("types") && !opts.isNull("types") ? opts.getString("types") : "null";
-    Log.d(TAG, "[getSuggestionsFromLocations] called with input=" + inputVal + ", country=" + countryVal + ", language=" + languageVal + ", types=" + typesVal);
+    Log.d(TAG, "[getSuggestionsFromLocations] called with input=" + inputVal);
 
     if (API_KEY == null || API_KEY.isEmpty()) {
       callbackContext.error("GOOGLE_MAPS_ANDROID_API_KEY is missing");
+      return;
+    }
+
+    if ((opts.has("language") && !opts.isNull("language"))
+        || (opts.has("languageCode") && !opts.isNull("languageCode"))) {
+      callbackContext.error("UNSUPPORTED_AUTOCOMPLETE_OPTION: Android Places SDK uses the device language and does not support a per-request languageCode");
+      return;
+    }
+    if (opts.optBoolean("includeQueryPredictions", false)) {
+      callbackContext.error("UNSUPPORTED_AUTOCOMPLETE_OPTION: Android Places SDK does not support includeQueryPredictions");
       return;
     }
 
@@ -779,26 +786,25 @@ public class PluginLocationService extends CordovaPlugin {
       FindAutocompletePredictionsRequest.Builder requestBuilder =
           FindAutocompletePredictionsRequest.builder().setQuery(inputVal);
 
-      if (opts.has("country") && !opts.isNull("country")) {
+      if (opts.has("regionCode") && !opts.isNull("regionCode")) {
+        requestBuilder.setRegionCode(opts.getString("regionCode"));
+      } else if (opts.has("country") && !opts.isNull("country")) {
         requestBuilder.setRegionCode(opts.getString("country"));
       } else if (opts.has("region") && !opts.isNull("region")) {
         requestBuilder.setRegionCode(opts.getString("region"));
       }
-      if (opts.has("types") && !opts.isNull("types")) {
-        ArrayList<String> types = new ArrayList<String>();
-        JSONArray typeArray = opts.optJSONArray("types");
-        if (typeArray != null) {
-          for (int i = 0; i < typeArray.length(); i++) {
-            types.add(typeArray.getString(i));
-          }
-        } else {
-          String[] typeValues = opts.getString("types").split(",");
-          for (String type : typeValues) {
-            if (!type.trim().isEmpty()) {
-              types.add(type.trim());
-            }
-          }
+      if (opts.has("includedRegionCodes") && !opts.isNull("includedRegionCodes")) {
+        ArrayList<String> includedRegionCodes = getStringList(opts.get("includedRegionCodes"));
+        if (!includedRegionCodes.isEmpty()) {
+          requestBuilder.setCountries(includedRegionCodes);
         }
+      }
+      if ((opts.has("includedPrimaryTypes") && !opts.isNull("includedPrimaryTypes"))
+          || (opts.has("types") && !opts.isNull("types"))) {
+        ArrayList<String> types = new ArrayList<String>();
+        Object typeValue = opts.has("includedPrimaryTypes")
+            ? opts.get("includedPrimaryTypes") : opts.get("types");
+        types.addAll(getStringList(typeValue));
         if (!types.isEmpty()) {
           requestBuilder.setTypesFilter(types);
         }
@@ -855,6 +861,26 @@ public class PluginLocationService extends CordovaPlugin {
             callbackContext.error("PLACES_AUTOCOMPLETE_FAILED: " + e.getMessage());
           }
         });
+  }
+
+  private ArrayList<String> getStringList(Object value) throws JSONException {
+    ArrayList<String> values = new ArrayList<String>();
+    if (value instanceof JSONArray) {
+      JSONArray array = (JSONArray) value;
+      for (int i = 0; i < array.length(); i++) {
+        values.add(array.getString(i));
+      }
+    } else if (value instanceof String) {
+      String[] parts = ((String) value).split(",");
+      for (String part : parts) {
+        if (!part.trim().isEmpty()) {
+          values.add(part.trim());
+        }
+      }
+    } else {
+      throw new JSONException("Expected a string or array of strings");
+    }
+    return values;
   }
 
 }

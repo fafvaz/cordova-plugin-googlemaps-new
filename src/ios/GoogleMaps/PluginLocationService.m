@@ -228,16 +228,39 @@
     NSMutableDictionary *body = [NSMutableDictionary dictionary];
     [body setObject:opts[@"input"] forKey:@"input"];
 
-    if (opts[@"language"]) {
+    if (opts[@"languageCode"]) {
+        [body setObject:opts[@"languageCode"] forKey:@"languageCode"];
+    } else if (opts[@"language"]) {
         [body setObject:opts[@"language"] forKey:@"languageCode"];
     }
-    if (opts[@"types"]) {
-        [body setObject:opts[@"types"] forKey:@"includedPrimaryTypes"];
+    id types = opts[@"includedPrimaryTypes"] ?: opts[@"types"];
+    if (types) {
+        if ([types isKindOfClass:[NSString class]]) {
+            NSMutableArray *typeList = [NSMutableArray array];
+            for (NSString *type in [types componentsSeparatedByString:@","]) {
+                NSString *trimmedType = [type stringByTrimmingCharactersInSet:
+                    [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                if (trimmedType.length > 0) {
+                    [typeList addObject:trimmedType];
+                }
+            }
+            [body setObject:typeList forKey:@"includedPrimaryTypes"];
+        } else {
+            [body setObject:types forKey:@"includedPrimaryTypes"];
+        }
     }
-    if (opts[@"country"]) {
+    if (opts[@"regionCode"]) {
+        [body setObject:opts[@"regionCode"] forKey:@"regionCode"];
+    } else if (opts[@"country"]) {
         [body setObject:opts[@"country"] forKey:@"regionCode"];
     } else if (opts[@"region"]) {
         [body setObject:opts[@"region"] forKey:@"regionCode"];
+    }
+    if (opts[@"includedRegionCodes"]) {
+        [body setObject:opts[@"includedRegionCodes"] forKey:@"includedRegionCodes"];
+    }
+    if (opts[@"includeQueryPredictions"]) {
+        [body setObject:opts[@"includeQueryPredictions"] forKey:@"includeQueryPredictions"];
     }
     if (opts[@"locationBias"]) {
         [body setObject:opts[@"locationBias"] forKey:@"locationBias"];
@@ -292,7 +315,8 @@
     [request setValue:bundleId forHTTPHeaderField:@"X-Ios-Bundle-Identifier"];
     NSLog(@"[getSuggestionsFromLocations] iOS Bundle ID: %@", bundleId);
 
-    [request setValue:@"suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat" forHTTPHeaderField:@"X-Goog-FieldMask"];
+    [request setValue:@"suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat,suggestions.queryPrediction.text"
+        forHTTPHeaderField:@"X-Goog-FieldMask"];
 
     NSURLSessionConfiguration *sessionConfiguration = [NSURLSessionConfiguration defaultSessionConfiguration];
     NSURLSession *session = [NSURLSession sessionWithConfiguration:sessionConfiguration];
@@ -354,6 +378,9 @@
                                                       NSMutableArray *out = [NSMutableArray array];
                                                       for (NSDictionary *suggestion in suggestions) {
                                                           NSDictionary *pred = [suggestion objectForKey:@"placePrediction"];
+                                                          if (!pred) {
+                                                              pred = [suggestion objectForKey:@"queryPrediction"];
+                                                          }
                                                           if (pred) {
                                                               NSString *description = @"";
                                                               NSDictionary *textObj = [pred objectForKey:@"text"];
