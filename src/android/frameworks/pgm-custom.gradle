@@ -107,6 +107,7 @@ android {
     dependencies {
         implementation "com.google.android.gms:play-services-maps:${PLAY_SERVICES_MAPS_VERSION}"
         implementation "com.google.android.gms:play-services-location:${PLAY_SERVICES_LOCATION_VERSION}"
+        implementation "com.google.android.libraries.places:places:6.0.2"
     }
 
     // -------------------------------------------------------------------------

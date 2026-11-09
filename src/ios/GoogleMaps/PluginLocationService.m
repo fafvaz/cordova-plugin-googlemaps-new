@@ -270,23 +270,26 @@
     [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
     [request setHTTPBody:jsonBody];
 
-    NSUserDefaults *myDefaults = [[NSUserDefaults alloc] initWithSuiteName:@"cordova.plugin.googlemaps"];
-    NSString *apiKey = [myDefaults objectForKey:@"GOOGLE_MAPS_API_KEY"];
-    if (apiKey) {
-        NSLog(@"[getSuggestionsFromLocations] API key found (length=%lu)", (unsigned long)apiKey.length);
-        [request setValue:apiKey forHTTPHeaderField:@"X-Goog-Api-Key"];
-        
-        // Send iOS Bundle ID so Google can verify the client application
-        NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
-        if (bundleId) {
-            [request setValue:bundleId forHTTPHeaderField:@"X-Ios-Bundle-Identifier"];
-            NSLog(@"[getSuggestionsFromLocations] iOS Bundle ID: %@", bundleId);
-        } else {
-            NSLog(@"[getSuggestionsFromLocations] WARNING: iOS Bundle ID is nil");
-        }
-    } else {
-        NSLog(@"[getSuggestionsFromLocations] GOOGLE_MAPS_API_KEY is NOT set in NSUserDefaults");
+    NSString *apiKey = [((CDVViewController *)self.viewController).settings
+        objectForKey:@"google_maps_ios_api_key"];
+    if (apiKey.length == 0) {
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                                            messageAsString:@"GOOGLE_MAPS_IOS_API_KEY is missing"];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        return;
     }
+    [request setValue:apiKey forHTTPHeaderField:@"X-Goog-Api-Key"];
+
+    NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+    if (bundleId.length == 0) {
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                                            messageAsString:@"IOS_BUNDLE_IDENTIFIER_UNAVAILABLE"];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        return;
+    }
+    [request setValue:bundleId forHTTPHeaderField:@"X-Ios-Bundle-Identifier"];
+    NSLog(@"[getSuggestionsFromLocations] iOS Bundle ID: %@", bundleId);
+
     [request setValue:@"suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat" forHTTPHeaderField:@"X-Goog-FieldMask"];
 
     NSURLSessionConfiguration *sessionConfiguration = [NSURLSessionConfiguration defaultSessionConfiguration];

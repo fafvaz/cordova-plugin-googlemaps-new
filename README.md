@@ -110,6 +110,20 @@ Setup you Google Maps API keys for Android & iOS in your `config.xml` as follows
   </widget>
   ```
 
+On Android, Places Autocomplete uses Google's Places SDK for Android (New). Enable
+Places API (New) and add the Android package name and SHA-1 fingerprint for the
+certificate used to sign the MABS build to the API key's Android application
+restrictions. If the key has API restrictions, allow both Places API (New) and
+Maps SDK for Android. Use the production signing certificate for production
+builds; a debug or different signing certificate will not match. The Places SDK
+requires AndroidX and a minimum Android SDK version of 23.
+
+On iOS, Places Autocomplete uses the Places API (New) web service and sends the
+app's bundle identifier with the request. Configure a separate iOS API key and
+restrict it to the exact bundle identifier used by the MABS build. Enable Places
+API (New), and allow both Places API (New) and Maps SDK for iOS in the API
+restrictions. Android- and iOS-restricted keys are not interchangeable.
+
 For the browser platform you need to specify the API-Key in JavaScript before calling `plugin.google.maps.Map.getMap()`:
 
 ```js

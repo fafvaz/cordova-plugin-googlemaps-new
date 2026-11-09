@@ -8,7 +8,6 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
 import androidx.annotation.NonNull;
@@ -21,8 +20,19 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.libraries.places.api.Places;
+import com.google.android.libraries.places.api.model.AutocompletePrediction;
+import com.google.android.libraries.places.api.model.AutocompleteSessionToken;
+import com.google.android.libraries.places.api.model.CircularBounds;
+import com.google.android.libraries.places.api.model.LocationBias;
+import com.google.android.libraries.places.api.model.LocationRestriction;
+import com.google.android.libraries.places.api.model.RectangularBounds;
+import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest;
+import com.google.android.libraries.places.api.net.FindAutocompletePredictionsResponse;
+import com.google.android.libraries.places.api.net.PlacesClient;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
@@ -37,7 +47,9 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+
 public class PluginLocationService extends CordovaPlugin {
   private Activity activity;
   private final String TAG = "PluginLocationService";
@@ -48,6 +60,75 @@ public class PluginLocationService extends CordovaPlugin {
 
   private GoogleApiClient googleApiClient = null;
   private String API_KEY = "";
+  private PlacesClient placesClient;
+  private final LinkedHashMap<String, AutocompleteSessionToken> autocompleteSessionTokens =
+      new LinkedHashMap<String, AutocompleteSessionToken>(16, 0.75f, true);
+
+  private synchronized PlacesClient getPlacesClient() {
+    if (placesClient == null) {
+      Context applicationContext = activity.getApplicationContext();
+      if (!Places.isInitialized()) {
+        Places.initializeWithNewPlacesApiEnabled(applicationContext, API_KEY);
+      }
+      placesClient = Places.createClient(applicationContext);
+    }
+    return placesClient;
+  }
+
+  private synchronized AutocompleteSessionToken getAutocompleteSessionToken(String token) {
+    AutocompleteSessionToken sessionToken = autocompleteSessionTokens.get(token);
+    if (sessionToken == null) {
+      sessionToken = AutocompleteSessionToken.newInstance();
+      autocompleteSessionTokens.put(token, sessionToken);
+      if (autocompleteSessionTokens.size() > 100) {
+        Iterator<String> oldestToken = autocompleteSessionTokens.keySet().iterator();
+        oldestToken.next();
+        oldestToken.remove();
+      }
+    }
+    return sessionToken;
+  }
+
+  private LatLng getLatLng(JSONObject coordinates) throws JSONException {
+    double latitude = coordinates.has("latitude")
+        ? coordinates.getDouble("latitude") : coordinates.getDouble("lat");
+    double longitude = coordinates.has("longitude")
+        ? coordinates.getDouble("longitude") : coordinates.getDouble("lng");
+    return new LatLng(latitude, longitude);
+  }
+
+  private CircularBounds getCircularBounds(JSONObject bounds) throws JSONException {
+    JSONObject circle = bounds.getJSONObject("circle");
+    return CircularBounds.newInstance(
+        getLatLng(circle.getJSONObject("center")), circle.getDouble("radius"));
+  }
+
+  private RectangularBounds getRectangularBounds(JSONObject bounds) throws JSONException {
+    JSONObject rectangle = bounds.getJSONObject("rectangle");
+    return RectangularBounds.newInstance(
+        getLatLng(rectangle.getJSONObject("low")),
+        getLatLng(rectangle.getJSONObject("high")));
+  }
+
+  private LocationBias getLocationBias(JSONObject bounds) throws JSONException {
+    if (bounds.has("circle")) {
+      return getCircularBounds(bounds);
+    }
+    if (bounds.has("rectangle")) {
+      return getRectangularBounds(bounds);
+    }
+    throw new JSONException("locationBias must contain circle or rectangle");
+  }
+
+  private LocationRestriction getLocationRestriction(JSONObject bounds) throws JSONException {
+    if (bounds.has("circle")) {
+      return getCircularBounds(bounds);
+    }
+    if (bounds.has("rectangle")) {
+      return getRectangularBounds(bounds);
+    }
+    throw new JSONException("locationRestriction must contain circle or rectangle");
+  }
 
   public void initialize(final CordovaInterface cordova, final CordovaWebView webView) {
     super.initialize(cordova, webView);
@@ -673,7 +754,7 @@ public class PluginLocationService extends CordovaPlugin {
     }
   }
 
-    @SuppressWarnings("unused")
+  @SuppressWarnings("unused")
   public void getSuggestionsFromLocations(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
     final JSONObject opts = args.getJSONObject(0);
 
@@ -682,145 +763,96 @@ public class PluginLocationService extends CordovaPlugin {
       return;
     }
 
-    String inputVal = opts.has("input") && !opts.isNull("input") ? opts.getString("input") : "null";
+    String inputVal = opts.getString("input");
     String countryVal = opts.has("country") && !opts.isNull("country") ? opts.getString("country") : "null";
     String languageVal = opts.has("language") && !opts.isNull("language") ? opts.getString("language") : "null";
     String typesVal = opts.has("types") && !opts.isNull("types") ? opts.getString("types") : "null";
     Log.d(TAG, "[getSuggestionsFromLocations] called with input=" + inputVal + ", country=" + countryVal + ", language=" + languageVal + ", types=" + typesVal);
 
-    // Build JSON request body for Places API (New) Autocomplete
-    HashMap<String, Object> body = new HashMap<String, Object>();
-    body.put("input", opts.getString("input"));
-
-    if (opts.has("language") && !opts.isNull("language")) {
-      body.put("languageCode", opts.getString("language"));
-    }
-    if (opts.has("types") && !opts.isNull("types")) {
-      body.put("includedPrimaryTypes", opts.getString("types"));
-    }
-    if (opts.has("country") && !opts.isNull("country")) {
-      body.put("regionCode", opts.getString("country"));
-    }
-    if (opts.has("locationBias") && !opts.isNull("locationBias")) {
-      body.put("locationBias", opts.get("locationBias"));
-    }
-    if (opts.has("locationRestriction") && !opts.isNull("locationRestriction")) {
-      body.put("locationRestriction", opts.get("locationRestriction"));
-    }
-    if (opts.has("origin") && !opts.isNull("origin")) {
-      body.put("origin", opts.get("origin"));
-    }
-    if (opts.has("inputOffset") && !opts.isNull("inputOffset")) {
-      body.put("inputOffset", opts.getInt("inputOffset"));
-    }
-    if (opts.has("sessionToken") && !opts.isNull("sessionToken")) {
-      body.put("sessionToken", opts.getString("sessionToken"));
+    if (API_KEY == null || API_KEY.isEmpty()) {
+      callbackContext.error("GOOGLE_MAPS_ANDROID_API_KEY is missing");
+      return;
     }
 
-    // Log request body
+    final FindAutocompletePredictionsRequest request;
     try {
-      Log.d(TAG, "[getSuggestionsFromLocations] request body: " + new JSONObject(body).toString());
-    } catch (Exception e) {
-      Log.e(TAG, "[getSuggestionsFromLocations] failed to log request body", e);
-    }
+      FindAutocompletePredictionsRequest.Builder requestBuilder =
+          FindAutocompletePredictionsRequest.builder().setQuery(inputVal);
 
-    // Log API key status
-    if (this.API_KEY != null && !this.API_KEY.isEmpty()) {
-      Log.d(TAG, "[getSuggestionsFromLocations] API key found (length=" + this.API_KEY.length() + ")");
-    } else {
-      Log.e(TAG, "[getSuggestionsFromLocations] API_KEY is empty or null");
-    }
-
-    // Place Autocomplete (New) endpoint
-    AsyncPostJsonWithURL httpPost = new AsyncPostJsonWithURL("https://places.googleapis.com/v1/places:autocomplete", new AsyncPostJsonWithURL.AsyncHttpPostInterface() {
-      @Override
-      public void onPostExecute(JSONObject result) {
-        PluginResult pluginResult = null;
-        try {
-          if (result == null) {
-            Log.e(TAG, "Places API (New): result is null (network/connection failure)");
-            pluginResult = new PluginResult(PluginResult.Status.ERROR, "CONNECTION_FAILED");
-          } else if (result.has("_httpStatus")) {
-            // Places API (New) returned an HTTP error; pass through Google's error message
-            int httpStatus = result.getInt("_httpStatus");
-            String errorMessage = "HTTP_" + httpStatus;
-            if (result.has("_errorBody")) {
-              Object errorBody = result.get("_errorBody");
-              if (errorBody instanceof JSONObject) {
-                JSONObject errObj = (JSONObject) errorBody;
-                if (errObj.has("error")) {
-                  JSONObject err = errObj.getJSONObject("error");
-                  if (err.has("message")) {
-                    errorMessage = err.getString("message");
-                  }
-                  if (err.has("status")) {
-                    errorMessage = err.getString("status") + ": " + errorMessage;
-                  }
-                } else if (errObj.has("message")) {
-                  errorMessage = errObj.getString("message");
-                } else {
-                  errorMessage = errorBody.toString();
-                }
-              } else {
-                errorMessage = errorBody.toString();
-              }
-            }
-            Log.e(TAG, "Places API (New) error: " + errorMessage);
-            JSONObject err = new JSONObject();
-            err.put("status", "REQUEST_DENIED");
-            err.put("error_message", errorMessage);
-            pluginResult = new PluginResult(PluginResult.Status.ERROR, err);
-          } else {
-            // Success response
-            JSONArray suggestions = result.optJSONArray("suggestions");
-            JSONArray out = new JSONArray();
-            if (suggestions != null) {
-              for (int i = 0; i < suggestions.length(); i++) {
-                JSONObject suggestion = suggestions.getJSONObject(i);
-                if (suggestion.has("placePrediction")) {
-                  JSONObject pred = suggestion.getJSONObject("placePrediction");
-                  String description = "";
-                  if (pred.has("text")) {
-                    JSONObject textObj = pred.getJSONObject("text");
-                    if (textObj.has("text")) {
-                      description = textObj.getString("text");
-                    }
-                  }
-                  if (description.isEmpty() && pred.has("structuredFormat")) {
-                    JSONObject sf = pred.getJSONObject("structuredFormat");
-                    if (sf.has("mainText")) {
-                      JSONObject mainText = sf.getJSONObject("mainText");
-                      if (mainText.has("text")) {
-                        description = mainText.getString("text");
-                      }
-                    }
-                  }
-                  out.put(description);
-                }
-              }
-            }
-            pluginResult = new PluginResult(PluginResult.Status.OK, out);
-            Log.d(TAG, "[getSuggestionsFromLocations] success: " + out.length() + " suggestions returned");
+      if (opts.has("country") && !opts.isNull("country")) {
+        requestBuilder.setRegionCode(opts.getString("country"));
+      }
+      if (opts.has("types") && !opts.isNull("types")) {
+        ArrayList<String> types = new ArrayList<String>();
+        JSONArray typeArray = opts.optJSONArray("types");
+        if (typeArray != null) {
+          for (int i = 0; i < typeArray.length(); i++) {
+            types.add(typeArray.getString(i));
           }
-        } catch (Exception e) {
-          Log.e(TAG, "[getSuggestionsFromLocations] exception: " + e.getMessage(), e);
-          pluginResult = new PluginResult(PluginResult.Status.ERROR, "EXCEPTION: " + e.getMessage());
-        } finally {
-          if (pluginResult == null) {
-            pluginResult = new PluginResult(PluginResult.Status.ERROR, "UNKNOWN_ERROR");
+        } else {
+          String[] typeValues = opts.getString("types").split(",");
+          for (String type : typeValues) {
+            if (!type.trim().isEmpty()) {
+              types.add(type.trim());
+            }
           }
-          callbackContext.sendPluginResult(pluginResult);
+        }
+        if (!types.isEmpty()) {
+          requestBuilder.setTypesFilter(types);
         }
       }
-    });
+      if (opts.has("inputOffset") && !opts.isNull("inputOffset")) {
+        requestBuilder.setInputOffset(opts.getInt("inputOffset"));
+      }
+      if (opts.has("sessionToken") && !opts.isNull("sessionToken")) {
+        requestBuilder.setSessionToken(getAutocompleteSessionToken(opts.getString("sessionToken")));
+      }
+      if (opts.has("origin") && !opts.isNull("origin")) {
+        requestBuilder.setOrigin(getLatLng(opts.getJSONObject("origin")));
+      }
+      if (opts.has("locationBias") && !opts.isNull("locationBias")) {
+        requestBuilder.setLocationBias(getLocationBias(opts.getJSONObject("locationBias")));
+      }
+      if (opts.has("locationRestriction") && !opts.isNull("locationRestriction")) {
+        requestBuilder.setLocationRestriction(
+            getLocationRestriction(opts.getJSONObject("locationRestriction")));
+      }
+      request = requestBuilder.build();
+    } catch (Exception e) {
+      Log.e(TAG, "[getSuggestionsFromLocations] invalid autocomplete options", e);
+      callbackContext.error("INVALID_AUTOCOMPLETE_OPTIONS: " + e.getMessage());
+      return;
+    }
 
-    // Set required headers for Places API (New)
-    httpPost.setHeader("X-Goog-Api-Key", this.API_KEY);
-    httpPost.setHeader("X-Goog-FieldMask",
-        "suggestions.placePrediction.text,suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat");
+    final PlacesClient client;
+    try {
+      client = getPlacesClient();
+    } catch (Exception e) {
+      Log.e(TAG, "[getSuggestionsFromLocations] failed to initialize Places SDK", e);
+      callbackContext.error("PLACES_SDK_INITIALIZATION_FAILED: " + e.getMessage());
+      return;
+    }
 
-    Log.d(TAG, "[getSuggestionsFromLocations] executing POST to https://places.googleapis.com/v1/places:autocomplete");
-    httpPost.execute(body);
+    client.findAutocompletePredictions(request)
+        .addOnSuccessListener(new OnSuccessListener<FindAutocompletePredictionsResponse>() {
+          @Override
+          public void onSuccess(FindAutocompletePredictionsResponse response) {
+            JSONArray suggestions = new JSONArray();
+            for (AutocompletePrediction prediction : response.getAutocompletePredictions()) {
+              suggestions.put(prediction.getFullText(null).toString());
+            }
+            Log.d(TAG, "[getSuggestionsFromLocations] success: "
+                + suggestions.length() + " suggestions returned");
+            callbackContext.success(suggestions);
+          }
+        })
+        .addOnFailureListener(new OnFailureListener() {
+          @Override
+          public void onFailure(Exception e) {
+            Log.e(TAG, "[getSuggestionsFromLocations] Places SDK request failed", e);
+            callbackContext.error("PLACES_AUTOCOMPLETE_FAILED: " + e.getMessage());
+          }
+        });
   }
 
 }
